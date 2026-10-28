@@ -953,7 +953,9 @@ function home () {
     <div class="hero-scrim"></div>
     <div class="hero-inner">
       <div class="hero-top">
-        <button class="mark" data-x="brand">BC</button>
+      <button class="mark" data-x="brand" aria-label="Broccoli Club home">
+      <img src="icons/favicon.svg" alt="Broccoli Club">
+      </button>
         <span class="chip ${st.open?'':'off'}"><i></i>${esc(st.text)}</span>
       </div>
       <div class="hero-copy">
