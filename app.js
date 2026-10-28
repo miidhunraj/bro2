@@ -12,8 +12,8 @@
 const CONFIG = {
   // Configure Supabase here once. Use the Project URL and PUBLIC anon/publishable key only.
   // Never place a service_role or secret key in frontend code.
-  SUPABASE_URL: 'https://YOUR-PROJECT.supabase.co',
-  SUPABASE_ANON_KEY: 'YOUR_SUPABASE_PUBLIC_ANON_KEY'
+  SUPABASE_URL: 'https://kjharewgwsbswkxbxghp.supabase.co',
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtqaGFyZXdnd3Nic3dreGJ4Z2hwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyMDkzMjAsImV4cCI6MjEwODc4NTMyMH0.pQ7S-T_uncf0Eoy3H0jaEvMq64W35hx5M1-cR2qkkNA'
 };
 /* --------------------------------------------------- */
 
