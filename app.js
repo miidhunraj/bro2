@@ -102,8 +102,28 @@ const API = {
     } catch { return local; }
   },
   async saveContent (patch) {
-    const merged = Object.assign(read(LS.content, clone(DEF_CONTENT)), patch); write(LS.content, merged);
-    if (this.online) { try { await this.client.from('bc_content').upsert({ id:1, data: merged }); } catch {} }
+    const current = read(LS.content, clone(DEF_CONTENT));
+    const merged = Object.assign({}, current, patch);
+
+    if (this.online) {
+      const { error } = await this.client
+        .from('bc_content')
+        .upsert(
+          {
+            id: 1,
+            data: merged,
+            updated_at: new Date().toISOString()
+          },
+          { onConflict: 'id' }
+        );
+
+      if (error) {
+        console.error('Supabase content save failed:', error);
+        throw new Error(error.message || 'Could not save shop details.');
+      }
+    }
+
+    write(LS.content, merged);
     return merged;
   },
 
@@ -117,8 +137,31 @@ const API = {
     } catch { return local; }
   },
   async saveSettings (patch) {
-    const merged = Object.assign(read(LS.settings, clone(DEF_SETTINGS)), patch); write(LS.settings, merged);
-    if (this.online) { try { await this.client.from('bc_settings').upsert({ id:1, data: merged }); } catch {} }
+    const current = Object.assign(
+      clone(DEF_SETTINGS),
+      read(LS.settings, {})
+    );
+    const merged = Object.assign({}, current, patch);
+
+    if (this.online) {
+      const { error } = await this.client
+        .from('bc_settings')
+        .upsert(
+          {
+            id: 1,
+            data: merged,
+            updated_at: new Date().toISOString()
+          },
+          { onConflict: 'id' }
+        );
+
+      if (error) {
+        console.error('Supabase settings save failed:', error);
+        throw new Error(error.message || 'Could not save settings.');
+      }
+    }
+
+    write(LS.settings, merged);
     return merged;
   },
 
@@ -502,8 +545,8 @@ function shopP () {
     ${i('mapsQuery','Maps query')}${i('phone','Phone')}${i('email','Email')}${i('instagram','Instagram URL')}</div>
   <div class="admin-sec"><h2>Opening hours</h2>
     ${(A.content.hours||[]).map((h,idx)=>`<div class="hours-row"><label>${DAYS_S[idx]}</label>
-      <input type="time" data-h="${idx}" data-k="o" value="${/^([01]\\d|2[0-3]):[0-5]\\d$/.test(h.o||'') ? h.o : '09:00'}">
-      <input type="time" data-h="${idx}" data-k="c" value="${/^([01]\\d|2[0-3]):[0-5]\\d$/.test(h.c||'') ? h.c : '21:00'}">
+      <input type="time" data-h="${idx}" data-k="o" value="${/^([01]\d|2[0-3]):[0-5]\d$/.test(h.o||'') ? h.o : '09:00'}">
+      <input type="time" data-h="${idx}" data-k="c" value="${/^([01]\d|2[0-3]):[0-5]\d$/.test(h.c||'') ? h.c : '21:00'}">
       <input type="checkbox" class="closed" data-h="${idx}" data-k="closed" ${h.closed?'checked':''}></div>`).join('')}</div>
   <button class="btn dark wide" data-x="save-shop">Save shop</button>`;
 }
@@ -616,15 +659,77 @@ document.addEventListener('click', async e => {
     case 'ocopy': { const o=A.orders.find(y=>y.id===id); if(o) navigator.clipboard?.writeText(o.message||''); toast('Copied'); return; }
     case 'odel': if (confirm('Delete order?')) { A.orders = await BC.deleteOrder(id); render(); } return;
 
-    case 'save-content': { const patch={}; document.querySelectorAll('[data-f]').forEach(f=>patch[f.dataset.f]=f.value);
-      const l=document.querySelector('[data-list="storyPoints"]'); if(l) patch.storyPoints=l.value.split('\n').map(s=>s.trim()).filter(Boolean);
-      A.content=await BC.saveContent(patch); render(); toast('Saved'); return; }
-    case 'save-shop': { const patch={}; document.querySelectorAll('[data-f]').forEach(f=>patch[f.dataset.f]=f.value);
-      const hours=(A.content.hours||[]).map(h=>({...h}));
-      document.querySelectorAll('[data-h]').forEach(e2=>{ const i=Number(e2.dataset.h); if(e2.dataset.k==='closed') hours[i].closed=e2.checked; else hours[i][e2.dataset.k]=e2.value; });
-      patch.hours=hours; A.content=await BC.saveContent(patch); render(); toast('Saved'); return; }
-    case 'save-settings': { const patch={}; document.querySelectorAll('[data-s]').forEach(f=>{ patch[f.dataset.s]= f.type==='checkbox'?f.checked:(f.type==='number'?Number(f.value):f.value.trim()); });
-      A.settings=await BC.saveSettings(patch); render(); toast('Saved'); return; }
+    case 'save-content': {
+      try {
+        const patch = {};
+        document.querySelectorAll('[data-f]').forEach(f => { patch[f.dataset.f] = f.value; });
+        const l = document.querySelector('[data-list="storyPoints"]');
+        if (l) patch.storyPoints = l.value.split('\n').map(s => s.trim()).filter(Boolean);
+        A.content = await BC.saveContent(patch);
+        render();
+        toast('Content saved successfully');
+      } catch (err) {
+        console.error(err);
+        toast('Save failed: ' + (err.message || 'Check Supabase'));
+      }
+      return;
+    }
+
+    case 'save-shop': {
+      try {
+        const patch = {};
+
+        document.querySelectorAll('[data-f]').forEach(f => {
+          patch[f.dataset.f] = f.value;
+        });
+
+        const hours = (A.content.hours || []).map(h => ({ ...h }));
+
+        document.querySelectorAll('[data-h]').forEach(el => {
+          const i = Number(el.dataset.h);
+
+          if (!hours[i]) return;
+
+          if (el.dataset.k === 'closed') {
+            hours[i].closed = el.checked;
+          } else {
+            hours[i][el.dataset.k] = el.value;
+          }
+        });
+
+        patch.hours = hours;
+        A.content = await BC.saveContent(patch);
+        render();
+        toast('Shop details saved successfully');
+      } catch (err) {
+        console.error(err);
+        toast('Save failed: ' + (err.message || 'Check Supabase'));
+      }
+      return;
+    }
+
+    case 'save-settings': {
+      try {
+        const patch = {};
+
+        document.querySelectorAll('[data-s]').forEach(f => {
+          patch[f.dataset.s] =
+            f.type === 'checkbox'
+              ? f.checked
+              : f.type === 'number'
+                ? Number(f.value)
+                : f.value.trim();
+        });
+
+        A.settings = await BC.saveSettings(patch);
+        render();
+        toast('Settings saved successfully');
+      } catch (err) {
+        console.error(err);
+        toast('Save failed: ' + (err.message || 'Check Supabase'));
+      }
+      return;
+    }
   }
 });
 document.addEventListener('submit', async e => {
